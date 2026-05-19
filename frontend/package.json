@@ -1,0 +1,51 @@
+{
+  "name": "rydo-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@types/node": "^20.11.19",
+    "tailwindcss": "^3.4.1",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35",
+    "axios": "^1.6.7",
+    "socket.io-client": "^4.6.1",
+    "zustand": "^4.5.0",
+    "react-hook-form": "^7.50.1",
+    "@hookform/resolvers": "^3.3.4",
+    "zod": "^3.22.4",
+    "date-fns": "^3.3.1",
+    "react-hot-toast": "^2.4.1",
+    "react-query": "^3.39.3",
+    "@tanstack/react-query": "^5.20.5",
+    "lucide-react": "^0.323.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.2.1",
+    "next-auth": "^4.24.5",
+    "js-cookie": "^3.0.5",
+    "@types/js-cookie": "^3.0.6",
+    "react-google-maps": "^9.4.5",
+    "@react-google-maps/api": "^2.19.3",
+    "framer-motion": "^11.0.6",
+    "recharts": "^2.12.0",
+    "dayjs": "^1.11.10"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.1.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.2",
+    "@typescript-eslint/parser": "^7.0.2"
+  }
+}

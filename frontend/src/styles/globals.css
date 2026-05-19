@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&display=swap');
+
+:root {
+  --rydo-green: #00C853;
+  --rydo-green-dark: #00A846;
+  --rydo-dark: #0A0A0A;
+  --rydo-gray: #111111;
+  --rydo-border: rgba(255,255,255,0.08);
+  --rydo-muted: #6B7280;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--rydo-dark);
+  color: #F5F5F5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--rydo-green); }
+
+/* Selection */
+::selection { background: rgba(0,200,83,0.3); color: white; }
+
+@layer components {
+  .rydo-card {
+    @apply bg-[#111111] border border-white/[0.06] rounded-2xl;
+  }
+
+  .rydo-btn-primary {
+    @apply bg-[#00C853] text-black font-semibold px-6 py-3 rounded-xl
+           hover:bg-[#00A846] active:scale-[0.98] transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .rydo-btn-secondary {
+    @apply border border-white/10 text-white font-medium px-6 py-3 rounded-xl
+           hover:bg-white/5 active:scale-[0.98] transition-all duration-150;
+  }
+
+  .rydo-input {
+    @apply w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3
+           text-white placeholder-white/30 outline-none
+           focus:border-[#00C853] focus:ring-1 focus:ring-[#00C853]/30
+           transition-all duration-150;
+  }
+
+  .rydo-label {
+    @apply text-sm font-medium text-white/60 mb-1.5 block;
+  }
+
+  .rydo-badge {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .rydo-section {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .nav-link {
+    @apply text-white/60 hover:text-white font-medium text-sm transition-colors duration-150;
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-[#00C853] to-[#69F0AE] bg-clip-text text-transparent;
+  }
+}
