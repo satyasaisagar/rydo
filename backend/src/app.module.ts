@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { getDatabaseConfig } from './config/database.config';
+import { HealthController } from './health.controller';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { RidesModule } from './rides/rides.module';
@@ -14,13 +15,12 @@ import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
-    // Config — global, loads .env + Vercel-injected env vars
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '.env.local'],
     }),
 
-    // Vercel Postgres (Neon) — auto-detects POSTGRES_URL or DB_HOST fallback
+    // Vercel Postgres (Neon) — auto-detects POSTGRES_URL
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) =>
@@ -28,10 +28,8 @@ import { AdminModule } from './admin/admin.module';
       inject: [ConfigService],
     }),
 
-    // Rate limiting
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
 
-    // Feature modules
     AuthModule,
     UsersModule,
     RidesModule,
@@ -41,5 +39,6 @@ import { AdminModule } from './admin/admin.module';
     NotificationsModule,
     AdminModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

@@ -1,85 +1,57 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 
-/**
- * Vercel Postgres (Neon) Database Configuration
- *
- * Vercel Postgres automatically injects these env vars when you connect
- * a Postgres database to your project:
- *   POSTGRES_URL              — pooled connection (use for app queries)
- *   POSTGRES_URL_NON_POOLING  — direct connection (use for migrations)
- *   POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DATABASE
- *
- * The DATABASE_URL env var is a fallback for local Docker development.
- */
 export const getDatabaseConfig = (
   configService: ConfigService,
 ): TypeOrmModuleOptions => {
   const isProduction = configService.get('NODE_ENV') === 'production';
 
-  // Vercel Postgres (Neon) — pooled URL takes priority
+  // Vercel Postgres (Neon) — POSTGRES_URL injected automatically by Vercel
   const postgresUrl =
     configService.get('POSTGRES_URL') ||
-    configService.get('DATABASE_URL') ||
-    buildLocalConnectionString(configService);
+    configService.get('DATABASE_URL');
+
+  const baseConfig = {
+    type: 'postgres' as const,
+    autoLoadEntities: true,
+    // In production, never auto-sync — use migrations
+    synchronize: !isProduction,
+    logging: !isProduction,
+    // Retry on connection failure — important for serverless cold starts
+    retryAttempts: 3,
+    retryDelay: 3000,
+    // Don't crash the app if DB is unreachable at startup
+    connectTimeoutMS: 10000,
+  };
 
   if (postgresUrl) {
     return {
-      type: 'postgres',
+      ...baseConfig,
       url: postgresUrl,
-      ssl: isProduction ? { rejectUnauthorized: false } : false,
-      autoLoadEntities: true,
-      synchronize: !isProduction,
-      logging: !isProduction,
-      extra: isProduction
-        ? {
-            // Neon serverless connection pool settings
-            max: 10,
-            idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 5000,
-          }
-        : {},
+      ssl: { rejectUnauthorized: false },
+      extra: {
+        // Neon serverless pool settings
+        max: 5,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
+      },
     };
   }
 
-  // Explicit host/port fallback (local development)
+  // Individual host vars — for local Docker or explicit Neon creds
+  const host = configService.get('POSTGRES_HOST') || configService.get('DB_HOST', 'localhost');
+  const port = configService.get<number>('POSTGRES_PORT') || configService.get<number>('DB_PORT', 5432);
+  const username = configService.get('POSTGRES_USER') || configService.get('DB_USERNAME', 'rydo_user');
+  const password = configService.get('POSTGRES_PASSWORD') || configService.get('DB_PASSWORD', 'rydo_password');
+  const database = configService.get('POSTGRES_DATABASE') || configService.get('DB_NAME', 'rydo_db');
+
   return {
-    type: 'postgres',
-    host:     configService.get('DB_HOST',     'localhost'),
-    port:     configService.get<number>('DB_PORT', 5432),
-    username: configService.get('DB_USERNAME', 'rydo_user'),
-    password: configService.get('DB_PASSWORD', 'rydo_password'),
-    database: configService.get('DB_NAME',     'rydo_db'),
-    ssl: false,
-    autoLoadEntities: true,
-    synchronize: true,
-    logging: true,
+    ...baseConfig,
+    host,
+    port,
+    username,
+    password,
+    database,
+    ssl: isProduction ? { rejectUnauthorized: false } : false,
   };
 };
-
-function buildLocalConnectionString(configService: ConfigService): string | null {
-  const host = configService.get('POSTGRES_HOST');
-  const user = configService.get('POSTGRES_USER');
-  const pass = configService.get('POSTGRES_PASSWORD');
-  const db   = configService.get('POSTGRES_DATABASE');
-  if (host && user && pass && db) {
-    return `postgres://${user}:${pass}@${host}/${db}?sslmode=require`;
-  }
-  return null;
-}
-
-/** For TypeORM CLI migrations — uses non-pooling direct connection */
-export const getMigrationDataSourceConfig = (
-  configService: ConfigService,
-) => ({
-  type: 'postgres' as const,
-  url:
-    configService.get('POSTGRES_URL_NON_POOLING') ||
-    configService.get('POSTGRES_URL') ||
-    configService.get('DATABASE_URL') ||
-    `postgres://${configService.get('DB_USERNAME', 'rydo_user')}:${configService.get('DB_PASSWORD', 'rydo_password')}@${configService.get('DB_HOST', 'localhost')}:${configService.get('DB_PORT', 5432)}/${configService.get('DB_NAME', 'rydo_db')}`,
-  ssl: configService.get('NODE_ENV') === 'production' ? { rejectUnauthorized: false } : false,
-  entities:   ['dist/**/*.entity.js'],
-  migrations: ['dist/database/migrations/*.js'],
-  synchronize: false,
-});

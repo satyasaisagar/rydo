@@ -1,28 +1,40 @@
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ExpressAdapter } from '@nestjs/platform-express';
+import * as express from 'express';
 import { AppModule } from '../src/app.module';
 import helmet from 'helmet';
 
-let cachedApp: any;
+const server = express();
+let isBootstrapped = false;
+let app: any;
 
 async function bootstrap() {
-  if (cachedApp) return cachedApp;
+  if (isBootstrapped) return;
 
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log'],
-  });
+  app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(server),
+    {
+      logger: ['error', 'warn', 'log'],
+      abortOnError: false, // Don't crash on DB connection errors
+    },
+  );
 
   // Security
-  app.use(helmet());
+  app.use(helmet({ contentSecurityPolicy: false }));
 
-  // CORS
+  // CORS — allow Vercel domains + localhost
   app.enableCors({
-    origin: [
-      process.env.FRONTEND_URL || 'http://localhost:3000',
-      /\.vercel\.app$/,
-      /localhost:\d+/,
-    ],
+    origin: (origin: string, cb: Function) => {
+      const allowed = !origin ||
+        /\.vercel\.app$/.test(origin) ||
+        /localhost:\d+/.test(origin) ||
+        origin === (process.env.FRONTEND_URL || '');
+      cb(null, allowed);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -35,17 +47,18 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
       transform: true,
       transformOptions: { enableImplicitConversion: true },
     }),
   );
 
   // Swagger
-  const config = new DocumentBuilder()
+  const swaggerConfig = new DocumentBuilder()
     .setTitle('Rydo API')
-    .setDescription('Rydo Ride Sharing Platform REST API')
+    .setDescription('Rydo Ride Sharing Platform — REST API')
     .setVersion('2.0')
+    .addServer('https://rydo-backend-mocha.vercel.app', 'Production')
+    .addServer('http://localhost:4000', 'Local Development')
     .addBearerAuth(
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
       'JWT-auth',
@@ -55,21 +68,26 @@ async function bootstrap() {
     .addTag('Notifications').addTag('Admin')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: { persistAuthorization: true },
+    swaggerOptions: { persistAuthorization: true, docExpansion: 'none' },
   });
 
   await app.init();
-
-  cachedApp = app;
-  return app;
+  isBootstrapped = true;
 }
 
 // Vercel serverless handler
 export default async (req: any, res: any) => {
-  const app = await bootstrap();
-  const httpAdapter = app.getHttpAdapter();
-  const instance = httpAdapter.getInstance();
-  instance(req, res);
+  try {
+    await bootstrap();
+    server(req, res);
+  } catch (err) {
+    console.error('Bootstrap error:', err?.message || err);
+    res.status(500).json({
+      statusCode: 500,
+      message: 'Server initialization failed',
+      error: process.env.NODE_ENV !== 'production' ? err?.message : 'Internal Server Error',
+    });
+  }
 };
