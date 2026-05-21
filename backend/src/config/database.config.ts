@@ -4,20 +4,17 @@ import { ConfigService } from '@nestjs/config';
 export const getDatabaseConfig = (
   configService: ConfigService,
 ): TypeOrmModuleOptions => {
-  const isProduction = configService.get('NODE_ENV') === 'production';
-
-  // DB_SYNC env var controls synchronize explicitly
-  // Set DB_SYNC=false in Vercel env vars after tables are created
-  const dbSync = configService.get('DB_SYNC');
-  const synchronize = dbSync !== undefined
-    ? dbSync === 'true'
-    : true; // DEFAULT: always sync until DB_SYNC=false is set
+  // DB_SYNC env var controls synchronize:
+  //   unset / 'true'  → sync on (creates tables — default for initial deploy)
+  //   'false'         → sync off (safe for production after tables exist)
+  const dbSync = configService.get<string>('DB_SYNC');
+  const synchronize = dbSync === 'false' ? false : true;
 
   const postgresUrl =
-    configService.get('POSTGRES_URL') ||
-    configService.get('DATABASE_URL');
+    configService.get<string>('POSTGRES_URL') ||
+    configService.get<string>('DATABASE_URL');
 
-  const baseConfig = {
+  const base = {
     type: 'postgres' as const,
     autoLoadEntities: true,
     synchronize,
@@ -29,7 +26,7 @@ export const getDatabaseConfig = (
 
   if (postgresUrl) {
     return {
-      ...baseConfig,
+      ...base,
       url: postgresUrl,
       ssl: { rejectUnauthorized: false },
       extra: {
@@ -40,13 +37,21 @@ export const getDatabaseConfig = (
     };
   }
 
+  // Local Docker / individual host vars
+  const host     = configService.get<string>('POSTGRES_HOST')     || configService.get<string>('DB_HOST')     || 'localhost';
+  const port      = Number(configService.get<string>('POSTGRES_PORT') || configService.get<string>('DB_PORT') || '5432');
+  const username  = configService.get<string>('POSTGRES_USER')     || configService.get<string>('DB_USERNAME') || 'rydo_user';
+  const password  = configService.get<string>('POSTGRES_PASSWORD') || configService.get<string>('DB_PASSWORD') || 'rydo_password';
+  const database  = configService.get<string>('POSTGRES_DATABASE') || configService.get<string>('DB_NAME')    || 'rydo_db';
+  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+
   return {
-    ...baseConfig,
-    host:     configService.get('POSTGRES_HOST') || configService.get('DB_HOST',     'localhost'),
-    port:     configService.get<number>('POSTGRES_PORT') || configService.get<number>('DB_PORT', 5432),
-    username: configService.get('POSTGRES_USER') || configService.get('DB_USERNAME', 'rydo_user'),
-    password: configService.get('POSTGRES_PASSWORD') || configService.get('DB_PASSWORD', 'rydo_password'),
-    database: configService.get('POSTGRES_DATABASE') || configService.get('DB_NAME',     'rydo_db'),
+    ...base,
+    host,
+    port,
+    username,
+    password,
+    database,
     ssl: isProduction ? { rejectUnauthorized: false } : false,
   };
 };
