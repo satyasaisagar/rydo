@@ -13,8 +13,6 @@ let bootstrapError: Error | null = null;
 async function bootstrap() {
   if (app) return app;
   if (bootstrapError) throw bootstrapError;
-
-  // Wait if already bootstrapping (concurrent cold starts)
   if (bootstrapping) {
     await new Promise(r => setTimeout(r, 200));
     return bootstrap();
@@ -24,7 +22,6 @@ async function bootstrap() {
   try {
     const instance = await NestFactory.create(AppModule, {
       logger: ['error', 'warn', 'log'],
-      // Never crash on error — let TypeORM retry in background
       abortOnError: false,
     });
 
@@ -54,13 +51,10 @@ async function bootstrap() {
       }),
     );
 
-    // Swagger docs
+    // Swagger — use unpkg CDN for assets (avoids broken static file serving on Vercel)
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Rydo API')
-      .setDescription(
-        'Rydo Ride Sharing Platform — REST API\n\n' +
-        '**Note:** Connect a Vercel Postgres database to enable all endpoints.',
-      )
+      .setDescription('Rydo Ride Sharing Platform — REST API')
       .setVersion('2.0')
       .addServer('https://rydo-backend-mocha.vercel.app', 'Production')
       .addServer('http://localhost:4000', 'Local')
@@ -74,13 +68,25 @@ async function bootstrap() {
       .build();
 
     const document = SwaggerModule.createDocument(instance, swaggerConfig);
+
     SwaggerModule.setup('api/docs', instance, document, {
-      swaggerOptions: { persistAuthorization: true, docExpansion: 'none' },
+      swaggerOptions: {
+        persistAuthorization: true,
+        docExpansion: 'none',
+        filter: true,
+        showRequestDuration: true,
+      },
+      // Use CDN-hosted Swagger UI assets — avoids static file 404s on Vercel
+      customCssUrl: 'https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css',
+      customJs: [
+        'https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js',
+        'https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js',
+      ],
+      customSiteTitle: 'Rydo API Docs',
+      customfavIcon: 'https://rydo-backend-mocha.vercel.app/favicon.ico',
     });
 
-    // init() starts listening but doesn't throw on DB errors (abortOnError: false)
     await instance.init();
-
     app = instance;
     return app;
   } catch (err: any) {
