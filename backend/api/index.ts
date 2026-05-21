@@ -6,31 +6,36 @@ import { AppModule } from '../src/app.module';
 import helmet from 'helmet';
 import type { Request, Response } from 'express';
 
-// Cached app instance for warm serverless invocations
 let app: any;
-let bootstrapPromise: Promise<any> | null = null;
+let bootstrapping = false;
+let bootstrapError: Error | null = null;
 
 async function bootstrap() {
   if (app) return app;
-  // Prevent multiple concurrent bootstraps on cold start
-  if (bootstrapPromise) return bootstrapPromise;
+  if (bootstrapError) throw bootstrapError;
 
-  bootstrapPromise = (async () => {
+  // Wait if already bootstrapping (concurrent cold starts)
+  if (bootstrapping) {
+    await new Promise(r => setTimeout(r, 200));
+    return bootstrap();
+  }
+
+  bootstrapping = true;
+  try {
     const instance = await NestFactory.create(AppModule, {
       logger: ['error', 'warn', 'log'],
+      // Never crash on error — let TypeORM retry in background
       abortOnError: false,
     });
 
-    // Security
     instance.use(helmet({ contentSecurityPolicy: false }));
 
-    // CORS
     instance.enableCors({
       origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
         const allowed =
           !origin ||
           /\.vercel\.app$/.test(origin) ||
-          /localhost:\d+/.test(origin) ||
+          /localhost(:\d+)?$/.test(origin) ||
           origin === (process.env.FRONTEND_URL || '');
         cb(null, allowed);
       },
@@ -39,10 +44,8 @@ async function bootstrap() {
       allowedHeaders: ['Content-Type', 'Authorization'],
     });
 
-    // Global prefix
     instance.setGlobalPrefix('api');
 
-    // Validation
     instance.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -51,13 +54,16 @@ async function bootstrap() {
       }),
     );
 
-    // Swagger
+    // Swagger docs
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Rydo API')
-      .setDescription('Rydo Ride Sharing Platform — REST API')
+      .setDescription(
+        'Rydo Ride Sharing Platform — REST API\n\n' +
+        '**Note:** Connect a Vercel Postgres database to enable all endpoints.',
+      )
       .setVersion('2.0')
       .addServer('https://rydo-backend-mocha.vercel.app', 'Production')
-      .addServer('http://localhost:4000', 'Local Development')
+      .addServer('http://localhost:4000', 'Local')
       .addBearerAuth(
         { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', in: 'header' },
         'JWT-auth',
@@ -72,28 +78,34 @@ async function bootstrap() {
       swaggerOptions: { persistAuthorization: true, docExpansion: 'none' },
     });
 
+    // init() starts listening but doesn't throw on DB errors (abortOnError: false)
     await instance.init();
+
     app = instance;
     return app;
-  })();
-
-  return bootstrapPromise;
+  } catch (err: any) {
+    bootstrapError = err;
+    throw err;
+  } finally {
+    bootstrapping = false;
+  }
 }
 
-// Vercel serverless handler — called on every request
 export default async (req: Request, res: Response) => {
   try {
     const instance = await bootstrap();
-    // Get the underlying HTTP adapter and delegate the request
-    const httpAdapter = instance.getHttpAdapter();
-    httpAdapter.getInstance()(req, res);
+    instance.getHttpAdapter().getInstance()(req, res);
   } catch (err: any) {
-    console.error('Bootstrap error:', err?.message || err);
-    res.statusCode = 500;
+    const msg = String(err?.message || err);
+    console.error('Bootstrap error:', msg);
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = 503;
     res.end(JSON.stringify({
-      statusCode: 500,
-      message: 'Server initialization error',
-      error: process.env.NODE_ENV !== 'production' ? String(err?.message) : 'Internal Server Error',
+      statusCode: 503,
+      message: 'Service temporarily unavailable',
+      hint: msg.includes('ECONNREFUSED') || msg.includes('connect')
+        ? 'Database not connected. Add POSTGRES_URL in Vercel project settings.'
+        : msg,
     }));
   }
 };
