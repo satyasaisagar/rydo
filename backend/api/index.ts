@@ -10,6 +10,47 @@ let app: any;
 let bootstrapping = false;
 let bootstrapError: Error | null = null;
 
+// Fully custom Swagger HTML — loads assets entirely from unpkg CDN
+// Avoids NestJS default template which references broken ./docs/... local paths
+function buildSwaggerHtml(jsonUrl: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rydo API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #1a1a1a; }
+    .swagger-ui .topbar { background: #0A0A0A; border-bottom: 1px solid #333; }
+    .swagger-ui .topbar .download-url-wrapper { display: none; }
+    .swagger-ui .info .title { color: #00C853; }
+  </style>
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+<script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js"></script>
+<script>
+  window.onload = function() {
+    SwaggerUIBundle({
+      url: "${jsonUrl}",
+      dom_id: '#swagger-ui',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+      plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+      layout: "StandaloneLayout",
+      persistAuthorization: true,
+      docExpansion: "none",
+      filter: true,
+      showRequestDuration: true,
+      deepLinking: true
+    });
+  };
+</script>
+</body>
+</html>`;
+}
+
 async function bootstrap() {
   if (app) return app;
   if (bootstrapError) throw bootstrapError;
@@ -51,7 +92,7 @@ async function bootstrap() {
       }),
     );
 
-    // Swagger — use unpkg CDN for assets (avoids broken static file serving on Vercel)
+    // Build Swagger JSON document
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Rydo API')
       .setDescription('Rydo Ride Sharing Platform — REST API')
@@ -69,24 +110,20 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(instance, swaggerConfig);
 
-    SwaggerModule.setup('api/docs', instance, document, {
-      swaggerOptions: {
-        persistAuthorization: true,
-        docExpansion: 'none',
-        filter: true,
-        showRequestDuration: true,
-      },
-      // Use CDN-hosted Swagger UI assets — avoids static file 404s on Vercel
-      customCssUrl: 'https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css',
-      customJs: [
-        'https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js',
-        'https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js',
-      ],
-      customSiteTitle: 'Rydo API Docs',
-      customfavIcon: 'https://rydo-backend-mocha.vercel.app/favicon.ico',
-    });
+    // Register /api/docs-json — raw OpenAPI spec
+    SwaggerModule.setup('api/docs', instance, document);
 
     await instance.init();
+
+    // Override /api/docs GET to serve our custom CDN-based HTML
+    // This runs AFTER NestJS registers its own /api/docs route,
+    // so we add our raw express handler that intercepts the exact path
+    const expressApp = instance.getHttpAdapter().getInstance();
+    expressApp.get('/api/docs', (_req: any, res: any) => {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(buildSwaggerHtml('/api/docs-json'));
+    });
+
     app = instance;
     return app;
   } catch (err: any) {
