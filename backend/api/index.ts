@@ -11,7 +11,8 @@ let bootstrapping = false;
 let bootstrapError: Error | null = null;
 let openApiDocument: any = null;
 
-const SWAGGER_HTML = `<!DOCTYPE html>
+// Served at /api/docs — pure CDN, zero local file deps
+const swaggerHtml = () => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -19,14 +20,10 @@ const SWAGGER_HTML = `<!DOCTYPE html>
   <title>Rydo API Docs</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css">
   <style>
-    body { margin: 0; background: #1a1a1a; }
-    .swagger-ui .topbar { background: #0A0A0A; border-bottom: 1px solid #2a2a2a; padding: 8px 16px; }
-    .swagger-ui .topbar-wrapper { display: flex; align-items: center; }
-    .swagger-ui .topbar .download-url-wrapper { display: none; }
-    .swagger-ui .info .title { color: #00C853; font-size: 2rem; }
-    .swagger-ui .info .description p { color: #aaa; }
-    .swagger-ui .scheme-container { background: #1a1a1a; padding: 16px; box-shadow: none; border-bottom: 1px solid #333; }
-    .swagger-ui select, .swagger-ui input[type=text], .swagger-ui textarea { background: #2a2a2a; color: #fff; border-color: #444; }
+    body { margin:0; background:#1a1a1a; }
+    .swagger-ui .topbar { background:#0A0A0A; border-bottom:1px solid #2a2a2a; }
+    .swagger-ui .topbar .download-url-wrapper { display:none; }
+    .swagger-ui .info .title { color:#00C853; }
   </style>
 </head>
 <body>
@@ -37,7 +34,7 @@ const SWAGGER_HTML = `<!DOCTYPE html>
 window.onload = function() {
   SwaggerUIBundle({
     url: "/api/docs-json",
-    dom_id: '#swagger-ui',
+    dom_id: "#swagger-ui",
     presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
     plugins: [SwaggerUIBundle.plugins.DownloadUrl],
     layout: "StandaloneLayout",
@@ -68,6 +65,27 @@ async function bootstrap() {
       abortOnError: false,
     });
 
+    // ── Middleware registered BEFORE setGlobalPrefix / init ──────────────
+    // This ensures our routes are registered in Express BEFORE NestJS
+    // processes them, so they take priority over NestJS routing.
+    const expressApp = instance.getHttpAdapter().getInstance();
+
+    // Swagger UI HTML
+    expressApp.get('/api/docs', (_req: any, res: any) => {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.end(swaggerHtml());
+    });
+
+    // OpenAPI JSON spec
+    expressApp.get('/api/docs-json', (_req: any, res: any) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.end(JSON.stringify(openApiDocument || { info: { title: 'Rydo API', version: '2.0' } }));
+    });
+
+    // ─────────────────────────────────────────────────────────────────────
+
     instance.use(helmet({ contentSecurityPolicy: false }));
 
     instance.enableCors({
@@ -94,7 +112,7 @@ async function bootstrap() {
       }),
     );
 
-    // Build OpenAPI document (but do NOT call SwaggerModule.setup)
+    // Build OpenAPI document
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Rydo API')
       .setDescription('Rydo Ride Sharing Platform — REST API')
@@ -112,33 +130,8 @@ async function bootstrap() {
 
     openApiDocument = SwaggerModule.createDocument(instance, swaggerConfig);
 
+    // Do NOT call SwaggerModule.setup() — our manual routes serve the docs
     await instance.init();
-
-    // Manually serve docs via raw Express — registered AFTER init()
-    // Use instance.use() which wraps the underlying Express app.use()
-    const expressApp = instance.getHttpAdapter().getInstance();
-
-    // Serve custom Swagger HTML at /api/docs
-    expressApp.get('/api/docs', (_req: any, res: any) => {
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.end(SWAGGER_HTML);
-    });
-
-    // Serve OpenAPI JSON spec at /api/docs-json
-    expressApp.get('/api/docs-json', (_req: any, res: any) => {
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.end(JSON.stringify(openApiDocument));
-    });
-
-    // Serve YAML spec at /api/docs-yaml
-    expressApp.get('/api/docs-yaml', (_req: any, res: any) => {
-      res.setHeader('Content-Type', 'text/yaml');
-      res.setHeader('Cache-Control', 'no-cache');
-      // Simple JSON to avoid yaml dep — just return JSON with yaml content-type
-      res.end(JSON.stringify(openApiDocument, null, 2));
-    });
 
     app = instance;
     return app;
