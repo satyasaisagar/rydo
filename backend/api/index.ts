@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from '../src/app.module';
+import { DataSource } from 'typeorm';
 import helmet from 'helmet';
 import type { Request, Response } from 'express';
 
@@ -11,8 +12,7 @@ let bootstrapping = false;
 let bootstrapError: Error | null = null;
 let openApiDocument: any = null;
 
-// Served at /api/docs — pure CDN, zero local file deps
-const swaggerHtml = () => `<!DOCTYPE html>
+const SWAGGER_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -54,7 +54,7 @@ async function bootstrap() {
   if (app) return app;
   if (bootstrapError) throw bootstrapError;
   if (bootstrapping) {
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
     return bootstrap();
   }
 
@@ -65,26 +65,19 @@ async function bootstrap() {
       abortOnError: false,
     });
 
-    // ── Middleware registered BEFORE setGlobalPrefix / init ──────────────
-    // This ensures our routes are registered in Express BEFORE NestJS
-    // processes them, so they take priority over NestJS routing.
     const expressApp = instance.getHttpAdapter().getInstance();
 
-    // Swagger UI HTML
+    // Swagger docs — registered BEFORE NestJS routes take over
     expressApp.get('/api/docs', (_req: any, res: any) => {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-cache');
-      res.end(swaggerHtml());
+      res.end(SWAGGER_HTML);
     });
-
-    // OpenAPI JSON spec
     expressApp.get('/api/docs-json', (_req: any, res: any) => {
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Cache-Control', 'no-cache');
-      res.end(JSON.stringify(openApiDocument || { info: { title: 'Rydo API', version: '2.0' } }));
+      res.end(JSON.stringify(openApiDocument || {}));
     });
-
-    // ─────────────────────────────────────────────────────────────────────
 
     instance.use(helmet({ contentSecurityPolicy: false }));
 
@@ -112,7 +105,6 @@ async function bootstrap() {
       }),
     );
 
-    // Build OpenAPI document
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Rydo API')
       .setDescription('Rydo Ride Sharing Platform — REST API')
@@ -130,8 +122,20 @@ async function bootstrap() {
 
     openApiDocument = SwaggerModule.createDocument(instance, swaggerConfig);
 
-    // Do NOT call SwaggerModule.setup() — our manual routes serve the docs
     await instance.init();
+
+    // ── Force schema sync on every cold start ─────────────────────────────
+    // Vercel serverless: each cold start must ensure tables exist.
+    // DataSource.synchronize() is idempotent — only runs ALTER/CREATE
+    // when entity metadata differs from actual DB schema.
+    try {
+      const dataSource = instance.get(DataSource);
+      await dataSource.synchronize();
+      console.log('[bootstrap] Schema synchronized ✓');
+    } catch (syncErr: any) {
+      // Log but don't crash — tables may already exist
+      console.warn('[bootstrap] Schema sync warning:', syncErr?.message);
+    }
 
     app = instance;
     return app;
@@ -155,9 +159,7 @@ export default async (req: Request, res: Response) => {
     res.end(JSON.stringify({
       statusCode: 503,
       message: 'Service temporarily unavailable',
-      hint: msg.includes('ECONNREFUSED') || msg.includes('connect')
-        ? 'Database not connected. Add POSTGRES_URL in Vercel project settings.'
-        : msg,
+      error: msg,
     }));
   }
 };
