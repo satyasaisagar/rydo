@@ -1,5 +1,16 @@
 version: '3.9'
 
+# ─────────────────────────────────────────────────────────────
+# Rydo — Local Development Docker Compose
+#
+# For production, database is hosted on Vercel Postgres (Neon).
+# This file is for LOCAL development only.
+#
+# To use Vercel Postgres locally instead of Docker:
+#   vercel env pull backend/.env
+#   cd backend && npm run start:dev
+# ─────────────────────────────────────────────────────────────
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -47,13 +58,20 @@ services:
     environment:
       NODE_ENV: development
       PORT: 4000
+      # Local Docker DB (used when POSTGRES_URL is not set)
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USERNAME: rydo_user
       DB_PASSWORD: rydo_password
       DB_NAME: rydo_db
+      # Local Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Vercel Postgres — uncomment to use Neon locally
+      # POSTGRES_URL: ${POSTGRES_URL}
+      # POSTGRES_URL_NON_POOLING: ${POSTGRES_URL_NON_POOLING}
+      # Vercel KV (Upstash) — uncomment to use Upstash locally
+      # KV_URL: ${KV_URL}
     env_file:
       - ./backend/.env
     ports:
@@ -97,10 +115,8 @@ services:
     restart: unless-stopped
     ports:
       - '80:80'
-      - '443:443'
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
     depends_on:
       - backend
       - frontend
