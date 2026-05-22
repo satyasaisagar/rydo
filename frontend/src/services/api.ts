@@ -1,18 +1,20 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import Cookies from 'js-cookie';
 
-// Use NEXT_PUBLIC_API_URL if set (e.g. for local dev pointing at a remote backend).
-// On Vercel production, leave BASE_URL empty so axios uses relative /api/* paths
-// which are transparently proxied to the backend via vercel.json rewrites.
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// Always use the absolute backend URL.
+// Relative paths ('/api') break on SSR (Next.js server-side) because Node.js
+// has no base URL to resolve them against — it silently falls back to localhost.
+// The vercel.json rewrite is a browser-only proxy and doesn't help SSR requests.
+const BACKEND_URL = 'https://rydo-backend-mocha.vercel.app';
 
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: BASE_URL ? `${BASE_URL}/api` : '/api',
+  baseURL: `${BACKEND_URL}/api`,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
-// Request interceptor – attach token
+// Request interceptor – attach JWT token
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = Cookies.get('rydo_access_token');
   if (token && config.headers) {
@@ -21,7 +23,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
-// Response interceptor – handle 401
+// Response interceptor – handle 401 → refresh token
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -31,7 +33,7 @@ apiClient.interceptors.response.use(
       try {
         const refreshToken = Cookies.get('rydo_refresh_token');
         if (!refreshToken) throw new Error('No refresh token');
-        const res = await axios.post(`${BASE_URL ? BASE_URL + '/api' : '/api'}/auth/refresh`, { refreshToken });
+        const res = await axios.post(`${BACKEND_URL}/api/auth/refresh`, { refreshToken });
         const { accessToken } = res.data;
         Cookies.set('rydo_access_token', accessToken, { expires: 1 });
         original.headers.Authorization = `Bearer ${accessToken}`;
@@ -46,7 +48,7 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Rides API
+// ─── Rides ────────────────────────────────────────────────
 export const ridesApi = {
   search: (params: Record<string, any>) => apiClient.get('/rides/search', { params }),
   getOne: (id: string) => apiClient.get(`/rides/${id}`),
@@ -57,7 +59,7 @@ export const ridesApi = {
   popularRoutes: () => apiClient.get('/rides/popular-routes'),
 };
 
-// Bookings API
+// ─── Bookings ─────────────────────────────────────────────
 export const bookingsApi = {
   create: (data: any) => apiClient.post('/bookings', data),
   myBookings: () => apiClient.get('/bookings/my'),
@@ -65,7 +67,7 @@ export const bookingsApi = {
   updateStatus: (id: string, data: any) => apiClient.put(`/bookings/${id}/status`, data),
 };
 
-// Users API
+// ─── Users ────────────────────────────────────────────────
 export const usersApi = {
   profile: () => apiClient.get('/users/profile'),
   publicProfile: (id: string) => apiClient.get(`/users/${id}/public`),
@@ -74,26 +76,26 @@ export const usersApi = {
   getVehicles: () => apiClient.get('/users/vehicles/my'),
 };
 
-// Chat API
+// ─── Chat ─────────────────────────────────────────────────
 export const chatApi = {
   getMessages: (rideId: string, page = 1) => apiClient.get(`/chats/${rideId}`, { params: { page } }),
   unreadCount: () => apiClient.get('/chats/unread/count'),
 };
 
-// Notifications API
+// ─── Notifications ────────────────────────────────────────
 export const notificationsApi = {
   getAll: (page = 1) => apiClient.get('/notifications', { params: { page } }),
   markRead: (id: string) => apiClient.put(`/notifications/${id}/read`),
   markAllRead: () => apiClient.put('/notifications/read-all'),
 };
 
-// Ratings API
+// ─── Ratings ──────────────────────────────────────────────
 export const ratingsApi = {
   create: (data: any) => apiClient.post('/ratings', data),
   getUserRatings: (userId: string) => apiClient.get(`/ratings/user/${userId}`),
 };
 
-// Admin API
+// ─── Admin ────────────────────────────────────────────────
 export const adminApi = {
   dashboard: () => apiClient.get('/admin/dashboard'),
   getUsers: (params?: any) => apiClient.get('/admin/users', { params }),

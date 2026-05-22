@@ -5,7 +5,7 @@ class SocketService {
   private url: string;
 
   constructor() {
-    this.url = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+    this.url = 'https://rydo-backend-mocha.vercel.app';
   }
 
   connect(userId: string) {
