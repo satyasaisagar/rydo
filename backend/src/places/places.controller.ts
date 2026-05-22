@@ -1,6 +1,7 @@
 import { Controller, Get, Query, HttpException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
+// Reads from GOOGLE_MAPS_API_KEY env var if set, otherwise uses the provided key
 const GMAPS_KEY = process.env.GOOGLE_MAPS_API_KEY || 'AIzaSyCFoPTcIqM5HENk3gFJMX1o_sGXXc_9FX4';
 
 @ApiTags('Places')

@@ -50,7 +50,16 @@ apiClient.interceptors.response.use(
 
 // ─── Rides ────────────────────────────────────────────────
 export const ridesApi = {
-  search: (params: Record<string, any>) => apiClient.get('/rides/search', { params }),
+  search: (params: Record<string, any>) => {
+    // Strip empty strings, false booleans that NestJS validation rejects, undefined values
+    const clean: Record<string, any> = {};
+    for (const [k, v] of Object.entries(params)) {
+      if (v === '' || v === undefined || v === null) continue;
+      if (k === 'womenOnly' && v === false) continue; // don't send womenOnly=false
+      clean[k] = v;
+    }
+    return apiClient.get('/rides/search', { params: clean });
+  },
   getOne: (id: string) => apiClient.get(`/rides/${id}`),
   create: (data: any) => apiClient.post('/rides', data),
   update: (id: string, data: any) => apiClient.put(`/rides/${id}`, data),
