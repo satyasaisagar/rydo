@@ -263,3 +263,5 @@ export function Divider({ label }: { label?: string }) {
     </div>
   );
 }
+export { default as LocationAutocomplete } from './LocationAutocomplete';
+export type { LocationResult } from './LocationAutocomplete';

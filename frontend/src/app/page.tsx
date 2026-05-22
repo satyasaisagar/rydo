@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { MapPin, Calendar, Users, ArrowRight, Star, Shield, Zap, ChevronRight } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
+import LocationAutocomplete from '@/components/ui/LocationAutocomplete';
 
 const POPULAR_ROUTES = [
   { from: 'Mumbai', to: 'Pune', price: 350, duration: '3h' },
@@ -67,27 +68,19 @@ export default function HomePage() {
           <form onSubmit={handleSearch}
             className="bg-[#111111] border border-white/[0.07] rounded-2xl p-2 max-w-4xl mx-auto shadow-2xl">
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-              <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3.5">
-                <MapPin className="w-4 h-4 text-[#00C853] shrink-0" />
-                <input
-                  type="text"
-                  placeholder="From city"
-                  value={search.from}
-                  onChange={e => setSearch({ ...search, from: e.target.value })}
-                  className="bg-transparent text-white placeholder-white/30 text-sm outline-none w-full"
-                />
-              </div>
+              <LocationAutocomplete
+                placeholder="From city or area"
+                value={search.from}
+                onChange={(val) => setSearch({ ...search, from: val })}
+                onSelect={(r) => setSearch({ ...search, from: r.displayName })}
+              />
 
-              <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3.5">
-                <MapPin className="w-4 h-4 text-white/30 shrink-0" />
-                <input
-                  type="text"
-                  placeholder="To city"
-                  value={search.to}
-                  onChange={e => setSearch({ ...search, to: e.target.value })}
-                  className="bg-transparent text-white placeholder-white/30 text-sm outline-none w-full"
-                />
-              </div>
+              <LocationAutocomplete
+                placeholder="To city or area"
+                value={search.to}
+                onChange={(val) => setSearch({ ...search, to: val })}
+                onSelect={(r) => setSearch({ ...search, to: r.displayName })}
+              />
 
               <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3.5">
                 <Calendar className="w-4 h-4 text-white/30 shrink-0" />

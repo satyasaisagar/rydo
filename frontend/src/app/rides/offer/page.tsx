@@ -5,20 +5,21 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MapPin, Calendar, Clock, Users, DollarSign, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, Plus, Trash2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import Navbar from '@/components/layout/Navbar';
 import { Button, Toggle, Input, Select, Card } from '@/components/ui';
+import LocationAutocomplete, { type LocationResult } from '@/components/ui/LocationAutocomplete';
 import { useCreateRide } from '@/hooks';
 import { useVehicles } from '@/hooks';
 import { getApiErrorMessage } from '@/utils';
 
 const schema = z.object({
-  pickupLocation: z.string().min(2, 'Required'),
+  pickupLocation: z.string().min(2, 'Enter pickup location'),
   pickupLat:      z.number(),
   pickupLng:      z.number(),
-  dropLocation:   z.string().min(2, 'Required'),
+  dropLocation:   z.string().min(2, 'Enter drop location'),
   dropLat:        z.number(),
   dropLng:        z.number(),
   rideDate:       z.string().min(1, 'Select date'),
@@ -51,6 +52,21 @@ export default function OfferRidePage() {
     defaultValues: { availableSeats: 3, pricePerSeat: 200, pickupLat: 0, pickupLng: 0, dropLat: 0, dropLng: 0 },
   });
 
+  const pickupValue = watch('pickupLocation') || '';
+  const dropValue   = watch('dropLocation')   || '';
+
+  const handlePickupSelect = (result: LocationResult) => {
+    setValue('pickupLocation', result.displayName, { shouldValidate: true });
+    setValue('pickupLat', result.lat);
+    setValue('pickupLng', result.lng);
+  };
+
+  const handleDropSelect = (result: LocationResult) => {
+    setValue('dropLocation', result.displayName, { shouldValidate: true });
+    setValue('dropLat', result.lat);
+    setValue('dropLng', result.lng);
+  };
+
   const onSubmit = async (data: FormData) => {
     try {
       await createRide({ ...data, ...prefs, stops });
@@ -63,9 +79,9 @@ export default function OfferRidePage() {
 
   const addStop = () => setStops([...stops, { stopName: '', latitude: 0, longitude: 0 }]);
   const removeStop = (i: number) => setStops(stops.filter((_, idx) => idx !== i));
-  const updateStop = (i: number, val: string) => {
+  const updateStop = (i: number, field: string, value: any) => {
     const updated = [...stops];
-    updated[i] = { ...updated[i], stopName: val };
+    updated[i] = { ...updated[i], [field]: value };
     setStops(updated);
   };
 
@@ -95,26 +111,34 @@ export default function OfferRidePage() {
             <Card className="p-6">
               <h2 className="text-white font-semibold mb-5">Route</h2>
               <div className="space-y-4">
-                <Input
+                <LocationAutocomplete
                   label="Pickup Location"
-                  placeholder="e.g. Mumbai, Maharashtra"
+                  placeholder="Search city or area..."
+                  value={pickupValue}
                   icon={<MapPin className="w-4 h-4" />}
                   error={errors.pickupLocation?.message}
-                  {...register('pickupLocation')}
+                  onChange={(val) => setValue('pickupLocation', val)}
+                  onSelect={handlePickupSelect}
                 />
+
                 {/* Stops */}
                 {stops.map((stop, i) => (
-                  <div key={i} className="flex gap-2">
+                  <div key={i} className="flex gap-2 items-start">
                     <div className="flex-1">
-                      <Input
+                      <LocationAutocomplete
                         placeholder={`Stop ${i + 1} (optional)`}
                         value={stop.stopName}
-                        onChange={e => updateStop(i, e.target.value)}
                         icon={<MapPin className="w-4 h-4" />}
+                        onChange={(val) => updateStop(i, 'stopName', val)}
+                        onSelect={(r) => {
+                          updateStop(i, 'stopName', r.displayName);
+                          updateStop(i, 'latitude', r.lat);
+                          updateStop(i, 'longitude', r.lng);
+                        }}
                       />
                     </div>
                     <button type="button" onClick={() => removeStop(i)}
-                      className="text-white/30 hover:text-red-400 transition-colors mt-0 flex items-center">
+                      className="text-white/30 hover:text-red-400 transition-colors mt-9 flex items-center">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -124,12 +148,14 @@ export default function OfferRidePage() {
                   <Plus className="w-4 h-4" /> Add a stop
                 </button>
 
-                <Input
+                <LocationAutocomplete
                   label="Drop Location"
-                  placeholder="e.g. Pune, Maharashtra"
+                  placeholder="Search city or area..."
+                  value={dropValue}
                   icon={<MapPin className="w-4 h-4" />}
                   error={errors.dropLocation?.message}
-                  {...register('dropLocation')}
+                  onChange={(val) => setValue('dropLocation', val)}
+                  onSelect={handleDropSelect}
                 />
               </div>
             </Card>
