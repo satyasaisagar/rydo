@@ -1,10 +1,13 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import Cookies from 'js-cookie';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+// Use NEXT_PUBLIC_API_URL if set (e.g. for local dev pointing at a remote backend).
+// On Vercel production, leave BASE_URL empty so axios uses relative /api/* paths
+// which are transparently proxied to the backend via vercel.json rewrites.
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: `${BASE_URL}/api`,
+  baseURL: BASE_URL ? `${BASE_URL}/api` : '/api',
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -28,7 +31,7 @@ apiClient.interceptors.response.use(
       try {
         const refreshToken = Cookies.get('rydo_refresh_token');
         if (!refreshToken) throw new Error('No refresh token');
-        const res = await axios.post(`${BASE_URL}/api/auth/refresh`, { refreshToken });
+        const res = await axios.post(`${BASE_URL ? BASE_URL + '/api' : '/api'}/auth/refresh`, { refreshToken });
         const { accessToken } = res.data;
         Cookies.set('rydo_access_token', accessToken, { expires: 1 });
         original.headers.Authorization = `Bearer ${accessToken}`;
