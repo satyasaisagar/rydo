@@ -265,3 +265,6 @@ export function Divider({ label }: { label?: string }) {
 }
 export { default as LocationAutocomplete } from './LocationAutocomplete';
 export type { LocationResult } from './LocationAutocomplete';
+
+export { default as CityPicker } from './CityPicker';
+export { default as CityBootstrap } from './CityBootstrap';

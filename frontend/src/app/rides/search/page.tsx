@@ -7,6 +7,7 @@ import { Calendar, Users, Filter, Star, Car, Music, PawPrint, Wind } from 'lucid
 import Link from 'next/link';
 import Navbar from '@/components/layout/Navbar';
 import LocationAutocomplete from '@/components/ui/LocationAutocomplete';
+import { useCityStore } from '@/store/cityStore';
 import { ridesApi } from '@/services/api';
 
 function SearchContent() {
@@ -21,6 +22,8 @@ function SearchContent() {
     womenOnly: false,
   });
 
+  const { selectedCity } = useCityStore();
+  const [outsideCity, setOutsideCity] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
 
