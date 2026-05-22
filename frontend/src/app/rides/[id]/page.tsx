@@ -76,7 +76,7 @@ export default function RideDetailPage() {
               <div className="flex flex-col items-center gap-2 pt-1">
                 <div className="w-3 h-3 rounded-full bg-[#00C853]" />
                 {ride.stops && ride.stops.length > 0
-                  ? ride.stops.map((s, i) => (
+                  ? ride.stops.map((s: any, i: number) => (
                       <div key={i} className="flex flex-col items-center">
                         <div className="w-px h-8 bg-white/10" />
                         <div className="w-2.5 h-2.5 rounded-full border-2 border-white/20" />
@@ -91,7 +91,7 @@ export default function RideDetailPage() {
                   <p className="text-white font-bold text-lg">{ride.pickupLocation}</p>
                   <span className="text-white/50 text-sm">{ride.rideTime?.slice(0, 5)}</span>
                 </div>
-                {ride.stops?.map((stop, i) => (
+                {ride.stops?.map((stop: any, i: number) => (
                   <div key={i} className="flex items-center justify-between mt-4 mb-1">
                     <p className="text-white/60">{stop.stopName}</p>
                     {stop.arrivalTime && <span className="text-white/30 text-sm">{stop.arrivalTime}</span>}

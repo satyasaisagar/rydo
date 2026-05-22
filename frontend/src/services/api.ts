@@ -99,4 +99,5 @@ export const adminApi = {
   getRides: (params?: any) => apiClient.get('/admin/rides', { params }),
   cancelRide: (id: string) => apiClient.put(`/admin/rides/${id}/cancel`),
   getBookings: (params?: any) => apiClient.get('/admin/bookings', { params }),
+  verifyUser: (id: string) => apiClient.put(`/admin/users/${id}/verify`),
 };
