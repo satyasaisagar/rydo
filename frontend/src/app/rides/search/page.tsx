@@ -15,7 +15,7 @@ function SearchContent() {
   const [filters, setFilters] = useState({
     pickup: searchParams.get('pickup') || '',
     drop:   searchParams.get('drop')   || '',
-    date:   searchParams.get('date')   || new Date().toISOString().split('T')[0],
+    date:   searchParams.get('date')   || '',   // empty = show all upcoming rides
     seats:  Number(searchParams.get('seats')) || 1,
     maxPrice:  '',
     womenOnly: false,
@@ -69,6 +69,7 @@ function SearchContent() {
               <Calendar className="w-4 h-4 text-white/30" />
               <input type="date" value={filters.date}
                 onChange={e => setFilters(f => ({ ...f, date: e.target.value }))}
+                placeholder="Any date"
                 className="bg-transparent text-white/70 text-sm outline-none" />
             </div>
 

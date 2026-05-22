@@ -49,21 +49,48 @@ export class RidesService {
       .leftJoinAndSelect('ride.rider', 'rider')
       .leftJoinAndSelect('ride.vehicle', 'vehicle')
       .where('ride.status = :status', { status: RideStatus.SCHEDULED })
-      .andWhere('ride.rideDate = :date', { date: dto.date })
       .andWhere('ride.availableSeats >= :seats', {
         seats: dto.seats || 1,
       });
 
-    if (dto.pickup) {
-      query.andWhere('LOWER(ride.pickupLocation) LIKE LOWER(:pickup)', {
-        pickup: `%${dto.pickup}%`,
+    // Date filter is optional — when provided, match exact date; otherwise show all upcoming
+    if (dto.date) {
+      query.andWhere('ride.rideDate = :date', { date: dto.date });
+    } else {
+      // Default: only show today and future rides
+      query.andWhere('ride.rideDate >= :today', {
+        today: new Date().toISOString().split('T')[0],
       });
     }
 
+    // Location matching: split comma-separated terms and match any term
+    // e.g. "Banjara Hills, Hyderabad" → match "Banjara Hills" OR "Hyderabad"
+    if (dto.pickup) {
+      const pickupTerms = dto.pickup.split(',').map(t => t.trim()).filter(Boolean);
+      if (pickupTerms.length > 1) {
+        query.andWhere(
+          `(${pickupTerms.map((_, i) => `LOWER(ride.pickupLocation) LIKE LOWER(:pickup${i})`).join(' OR ')})`,
+          Object.fromEntries(pickupTerms.map((t, i) => [`pickup${i}`, `%${t}%`]))
+        );
+      } else {
+        query.andWhere('LOWER(ride.pickupLocation) LIKE LOWER(:pickup)', {
+          pickup: `%${pickupTerms[0]}%`,
+        });
+      }
+    }
+
     if (dto.drop) {
-      query.andWhere('LOWER(ride.dropLocation) LIKE LOWER(:drop)', {
-        drop: `%${dto.drop}%`,
-      });
+      const dropTerms = dto.drop.split(',').map(t => t.trim()).filter(Boolean);
+      if (dropTerms.length > 1) {
+        query.andWhere(
+          `(${dropTerms.map((_, i) => `LOWER(ride.dropLocation) LIKE LOWER(:drop${i})`).join(' OR ')})`,
+          Object.fromEntries(dropTerms.map((t, i) => [`drop${i}`, `%${t}%`]))
+        );
+      } else {
+        query.andWhere('LOWER(ride.dropLocation) LIKE LOWER(:drop)', {
+          drop: `%${dropTerms[0]}%`,
+        });
+      }
     }
 
     if (dto.minPrice !== undefined) {
