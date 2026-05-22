@@ -31,7 +31,9 @@ interface PlacePrediction {
   terms: { value: string; offset: number }[];
 }
 
-const GMAPS_KEY = 'AIzaSyCFoPTcIqM5HENk3gFJMX1o_sGXXc_9FX4';
+// Route through our backend proxy to avoid CORS — Google Places API
+// blocks direct browser requests from non-whitelisted origins.
+const BACKEND = 'https://rydo-backend-mocha.vercel.app';
 
 // Build a short "area, city" label from prediction terms
 // terms[0] = sublocality/area, terms[1] = city/district, terms[2] = state, terms[3] = country
@@ -91,15 +93,11 @@ export default function LocationAutocomplete({
       // Google Places Autocomplete — biased to India, prefer sublocalities & localities
       const params = new URLSearchParams({
         input: query,
-        key: GMAPS_KEY,
         sessiontoken: sessionToken.current,
-        components: 'country:in',
-        language: 'en',
-        types: 'geocode',        // sublocality, locality, route, etc
       });
 
       const res = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params}`
+        `${BACKEND}/api/places/autocomplete?${params}`
       );
       const data = await res.json();
 
@@ -142,11 +140,9 @@ export default function LocationAutocomplete({
 
       const params = new URLSearchParams({
         place_id: pred.place_id,
-        fields: 'geometry,formatted_address',
-        key: GMAPS_KEY,
       });
       const res = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?${params}`
+        `${BACKEND}/api/places/details?${params}`
       );
       const data = await res.json();
       const loc = data.result?.geometry?.location;

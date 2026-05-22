@@ -12,6 +12,7 @@ import { ChatsModule } from './chats/chats.module';
 import { RatingsModule } from './ratings/ratings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
+import { PlacesModule } from './places/places.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AdminModule } from './admin/admin.module';
     RatingsModule,
     NotificationsModule,
     AdminModule,
+    PlacesModule,
   ],
   controllers: [HealthController],
 })

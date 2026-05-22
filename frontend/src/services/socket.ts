@@ -1,79 +1,58 @@
-import { io, Socket } from 'socket.io-client';
+// Socket.IO is disabled on Vercel — serverless functions don't support
+// persistent WebSocket connections. Chat uses HTTP polling fallback instead.
+// To enable real-time chat, deploy the backend on a persistent server
+// (Railway, Render, EC2) and set NEXT_PUBLIC_SOCKET_URL.
 
 class SocketService {
-  private socket: Socket | null = null;
-  private url: string;
+  private enabled: boolean;
 
   constructor() {
-    this.url = 'https://rydo-backend-mocha.vercel.app';
+    // Only attempt socket if explicitly configured AND running in browser
+    this.enabled = false;
   }
 
-  connect(userId: string) {
-    if (this.socket?.connected) return;
-
-    this.socket = io(`${this.url}/chat`, {
-      auth: { userId },
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      transports: ['websocket', 'polling'],
-    });
-
-    this.socket.on('connect', () => console.log('🔌 Socket connected:', this.socket?.id));
-    this.socket.on('disconnect', () => console.log('🔌 Socket disconnected'));
-    this.socket.on('connect_error', (err) => console.error('Socket error:', err));
+  connect(_userId: string) {
+    // no-op on Vercel — WebSockets not supported on serverless
   }
 
   disconnect() {
-    this.socket?.disconnect();
-    this.socket = null;
+    // no-op
   }
 
-  joinRideRoom(rideId: string) {
-    this.socket?.emit('join_ride_room', { rideId });
-  }
+  joinRideRoom(_rideId: string) {}
 
-  sendMessage(data: {
+  sendMessage(_data: {
     rideId: string;
     senderId: string;
     receiverId: string;
     message: string;
     messageType?: string;
-  }) {
-    this.socket?.emit('send_message', data);
+  }) {}
+
+  onReceiveMessage(_callback: (message: any) => void) {
+    return () => {}; // return no-op unsubscribe
   }
 
-  onReceiveMessage(callback: (message: any) => void) {
-    this.socket?.on('receive_message', callback);
-    return () => this.socket?.off('receive_message', callback);
+  emitTyping(_rideId: string, _userId: string, _isTyping: boolean) {}
+
+  onTyping(_callback: (data: { userId: string; isTyping: boolean }) => void) {
+    return () => {};
   }
 
-  emitTyping(rideId: string, userId: string, isTyping: boolean) {
-    this.socket?.emit('typing', { rideId, userId, isTyping });
+  onBookingRequest(_callback: (data: any) => void) {
+    return () => {};
   }
 
-  onTyping(callback: (data: { userId: string; isTyping: boolean }) => void) {
-    this.socket?.on('typing', callback);
-    return () => this.socket?.off('typing', callback);
+  onBookingAccepted(_callback: (data: any) => void) {
+    return () => {};
   }
 
-  onBookingRequest(callback: (data: any) => void) {
-    this.socket?.on('booking_request', callback);
-    return () => this.socket?.off('booking_request', callback);
-  }
-
-  onBookingAccepted(callback: (data: any) => void) {
-    this.socket?.on('booking_accepted', callback);
-    return () => this.socket?.off('booking_accepted', callback);
-  }
-
-  onUserOnline(callback: (data: { userId: string }) => void) {
-    this.socket?.on('user_online', callback);
-    return () => this.socket?.off('user_online', callback);
+  onUserOnline(_callback: (data: { userId: string }) => void) {
+    return () => {};
   }
 
   isConnected() {
-    return this.socket?.connected ?? false;
+    return false;
   }
 }
 
